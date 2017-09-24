@@ -10,6 +10,8 @@ from scipy.sparse import lil_matrix
 from matplotlib import pyplot as plt
 import networkx as nx
 from fim import apriori
+import logging
+import sys
 
 
 def test_data():
@@ -83,34 +85,29 @@ def plot_graph(data, items):
     plt.show()
 
 
+def read_file(file_path, process=lambda x: x):
+    contents_list = list()
+    logging.info(file_path)
+    try:
+        with open(file_path, encoding='utf8') as input_file:
+            for line in input_file:
+                line = process(line)
+                if line:
+                    contents_list.append(line)
+
+            return contents_list
+
+    except IOError as err:
+        logging.warning('Failed to open file {0}'.format(err.message))
+        sys.exit(1)
+
+
 def main():
     ###############################################################################
     # Some basic data analysis
     ###############################################################################
 
-    data = test_data()
-    # Find items list
-    items = np.unique([item for sublist in data for item in sublist])
-    # Size of data
-    N_baskets = len(data)
-    M_items = len(items)
-    ###############################################################################
-    # Convert data into vector space format.  We will use a sparse boolean matrix
-    #   to represent data
-
-    #plot_matrix(data, N_baskets, M_items)
-
-    ###############################################################################
-    ###############################################################################
-    # Convert data into graph format
-    ###############################################################################
-
-    #plot_graph(data, items)
-
-    ###############################################################################
-    # Now do rule finding
-    ###############################################################################
-
+    data = read_file("/Users/zxj/cs535/data/marketing.data", lambda x: x.split(","))
     frequent_itemset = apriori(data, supp=-3, zmin=2, target='s', report='a')
     rules = apriori(data, supp=-3, zmin=2, target='r', report='rCL')
     print("Frequent itemsets are: ")
