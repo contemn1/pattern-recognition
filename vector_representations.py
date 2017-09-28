@@ -5,6 +5,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 import nltk
 import numpy as np
 from matplotlib import pyplot as plt
+from scipy import vstack
+from nltk.stem.porter import PorterStemmer
 
 
 # divide 20news data into different groups
@@ -38,10 +40,15 @@ def calculate_similarity_in_one_group(matrix, groups_map):
     return similarity_matrix
 
 
+def divide_data_in_group(groups_map, number):
+    representative_group = {key: value[:number] for key, value in groups_map.items()}
+    query_group = {key: value[number:] for key, value in groups_map.items()}
+    return representative_group, query_group
+
+
 def calculate_similarity_between_groups(matrix, groups_map):
     num_of_groups = len(groups_map.keys())
-    representative_group = {key: value[:100] for key, value in groups_map.items()}
-    query_group = {key: value[100:] for key, value in groups_map.items()}
+    representative_group, query_group = divide_data_in_group(groups_map, 100)
     similarity_matrix = np.ones((len(query_group.keys()), len(representative_group.keys())))
     for first in range(num_of_groups):
         for second in range(num_of_groups):
@@ -50,8 +57,48 @@ def calculate_similarity_between_groups(matrix, groups_map):
     return similarity_matrix
 
 
-if __name__ == '__main__':
+def calculate_precision_and_recall(query_group, matrix, threshold):
+    indices_list = [ele for indices in query_group.values() for ele in indices]
+    query_set = matrix[indices_list]
+    precision_list = []
+    recall_list = []
+    for key, value in query_group.items():
+        if key == 0:
+            query_matrix = matrix[value]
+            num_true_positive = calculate_num_qualified(threshold, query_matrix)
+            num_all_positive = calculate_num_qualified(threshold, query_matrix, query_set)
+            precision = (num_true_positive / num_all_positive).mean()
+            recall = (num_true_positive / len(value)).mean()
+            precision_list.append(precision)
+            recall_list.append(recall)
+
+    average_precision = np.mean(precision_list)
+    average_recall = np.mean(recall_list)
+    return average_precision, average_recall
+
+
+def calculate_num_qualified(threshold, first, second=None):
+    similarity_matrix = cosine_similarity(first, second) if second is not None else cosine_similarity(first)
+    return np.sum(similarity_matrix > threshold, axis=1)
+
+
+def create_analyzer(old_analyzer, stemmer):
+    def steamed_words(document):
+        return (stemmer.stem(word) for word in old_analyzer(document))
+    return steamed_words()
+
+
+def test():
     vectorizer_1 = CountVectorizer()
+    '''
+    analyzer = vectorizer_1.build_analyzer()
+    stemmer = PorterStemmer()
+    vectorizer_1 = CountVectorizer(analyzer=create_analyzer(analyzer, stemmer))
+    '''
     matrix, groups_map = construct_matrix_and_group(vectorizer_1)
-    similarity_matrix = calculate_similarity_in_one_group(matrix, groups_map)
-    print(similarity_matrix.max())
+    _, query_group = divide_data_in_group(groups_map, 100)
+    calculate_precision_and_recall(query_group, matrix, 0.25)
+
+
+if __name__ == '__main__':
+    test()
