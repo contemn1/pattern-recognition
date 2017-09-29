@@ -52,8 +52,8 @@ def calculate_similarity_between_groups(matrix, groups_map):
     similarity_matrix = np.ones((len(query_group.keys()), len(representative_group.keys())))
     for first in range(num_of_groups):
         for second in range(num_of_groups):
-            average_similarity = cosine_similarity(matrix[representative_group[first]],
-                                                   matrix[query_group[second]]).mean()
+            average_similarity = cosine_similarity(matrix[query_group[first]],
+                                                   matrix[representative_group[second]]).mean()
             similarity_matrix[first][second] = average_similarity
     return similarity_matrix
 
@@ -64,14 +64,13 @@ def calculate_precision_and_recall(query_group, matrix, threshold):
     precision_list = []
     recall_list = []
     for key, value in query_group.items():
-        if key == 0:
-            query_matrix = matrix[value]
-            num_true_positive = calculate_num_qualified(threshold, query_matrix)
-            num_all_positive = calculate_num_qualified(threshold, query_matrix, query_set)
-            precision = (num_true_positive / num_all_positive).mean()
-            recall = (num_true_positive / len(value)).mean()
-            precision_list.append(precision)
-            recall_list.append(recall)
+        query_matrix = matrix[value]
+        num_true_positive = calculate_num_qualified(threshold, query_matrix)
+        num_all_positive = calculate_num_qualified(threshold, query_matrix, query_set)
+        precision = (num_true_positive / num_all_positive).mean()
+        recall = (num_true_positive / len(value)).mean()
+        precision_list.append(precision)
+        recall_list.append(recall)
 
     average_precision = np.mean(precision_list)
     average_recall = np.mean(recall_list)
@@ -103,8 +102,11 @@ def test():
     stemmer = PorterStemmer()
     vectorizer_2 = CountVectorizer(tokenizer=create_tokenizer(tokenizer, stemmer))
     matrix, groups_map = construct_matrix_and_group(vectorizer_2)
-    matrix_to_output = matrix.toarray()
-    np.save("./count_stem_matrix", matrix_to_output)
+    print(matrix)
+    
+
+def load_npy_file(file_path):
+    return np.load(file_path)
 
 if __name__ == '__main__':
     test()
