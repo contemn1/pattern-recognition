@@ -23,7 +23,7 @@ def group_data(twenty_train):
 
 
 def construct_matrix_and_group(vectorizer):
-    twenty_train = fetch_20newsgroups(subset="all", shuffle=True)
+    twenty_train = fetch_20newsgroups(subset="test", shuffle=True)
     group_matrix = vectorizer.fit_transform(twenty_train.data)
     groups = group_data(twenty_train)
     return group_matrix, groups
@@ -84,20 +84,18 @@ def calculate_num_qualified(threshold, first, second=None):
 
 def create_analyzer(old_analyzer, stemmer):
     def steamed_words(document):
-        return (stemmer.stem(word) for word in old_analyzer(document))
-    return steamed_words()
+        return [stemmer.stem(word) for word in old_analyzer(document)]
+    return steamed_words
 
 
 def test():
     vectorizer_1 = CountVectorizer()
-    '''
+
     analyzer = vectorizer_1.build_analyzer()
     stemmer = PorterStemmer()
     vectorizer_1 = CountVectorizer(analyzer=create_analyzer(analyzer, stemmer))
-    '''
+
     matrix, groups_map = construct_matrix_and_group(vectorizer_1)
-    _, query_group = divide_data_in_group(groups_map, 100)
-    calculate_precision_and_recall(query_group, matrix, 0.25)
 
 
 if __name__ == '__main__':
