@@ -7,7 +7,9 @@ import numpy as np
 from matplotlib import pyplot as plt
 from scipy import vstack
 from nltk.stem.porter import PorterStemmer
-
+import configparser
+from self_defined_exceptions import NoArgumentException
+from self_defined_exceptions import InvalidArgumentException
 
 # divide 20news data into different groups
 def group_data(twenty_train):
@@ -95,18 +97,92 @@ def create_tokenizer(tokenizer, stemmer):
     return tokenize
 
 
+def load_npy_file(file_path):
+    return np.load(file_path)
+
+
 def test():
     vectorizer_1 = CountVectorizer()
 
     tokenizer = vectorizer_1.build_tokenizer()
     stemmer = PorterStemmer()
-    vectorizer_2 = CountVectorizer(tokenizer=create_tokenizer(tokenizer, stemmer))
-    matrix, groups_map = construct_matrix_and_group(vectorizer_2)
-    print(matrix)
-    
+    matrix, groups_map = construct_matrix_and_group(vectorizer_1)
+    _, query_group = divide_data_in_group(groups_map, 100)
+    for x in np.arange(0.1, 1.0, 0.1):
+        print(calculate_precision_and_recall(query_group, matrix, x))
 
-def load_npy_file(file_path):
-    return np.load(file_path)
+
+def read_configs(config_path):
+    config = configparser.ConfigParser()
+    config.read(config_path)
+    config_dict = {key: string_to_attributes(value) for key, value in config["arguments"].items()}
+    return config_dict
+
+
+def string_to_attributes(input_string):
+    if input_string.lower() in {"yes", "true"}:
+        return True
+    if input_string.lower() in {"no", "false"}:
+        return False
+
+    return input_string
+
+
+def verify_configs(config_dict):
+    if not config_dict["vectorizer"]:
+        raise NoArgumentException("Please specify the type of Vectorizer")
+    if config_dict["vectorizer"].lower() not in ["count", "tf-idf", "none"]:
+        raise InvalidArgumentException("The Vectorizer type you specified in invalid")
+
+    if config_dict["read_matrix_from_file"] and not config_dict["matrix_file_path"]:
+        raise NoArgumentException("Please specify the path of matrix file")
+
+    if config_dict["vectorizer"].lower() == "none" and not config_dict["read_matrix_from_file"]:
+        raise InvalidArgumentException("Please specify the matrix file path")
+
+
+def build_vectorizer(vectorizer_type, use_stemmer):
+    tokenizer = create_tokenizer(CountVectorizer.build_tokenizer(), PorterStemmer()) if use_stemmer else None
+    if vectorizer_type == "count":
+        return CountVectorizer(tokenizer=tokenizer, stop_words="english")
+
+    if vectorizer_type == "tf-idf":
+        return TfidfVectorizer(tokenizer=tokenizer, stop_words="english")
+
+    return None
+
+
+def do_experiment(config_path):
+    config_dict = read_configs(config_path)
+    verify_configs(config_dict)
+    vecotrizer = build_vectorizer(config_dict["vectorizer"], config_dict["use_porter_stemmer"])
+    twenty_train = fetch_20newsgroups(subset="all", shuffle=True)
+    group_map = group_data(twenty_train)
+
+    if config_dict["read_matrix_from_file"]:
+        matrix = np.load(config_dict["matrix_file_path"])
+        if config_dict["save_matrix"]:
+            np.save(config_dict["save_matrix_path"])
+
+    else:
+        matrix = vecotrizer.fit_transform(twenty_train.data)
+
+    if config_dict["calculate_similarity_one_group"]:
+        one_group_matrix = calculate_similarity_in_one_group(matrix, group_map)
+        if config_dict["visualize"]:
+            print(one_group_matrix)
+
+    if config_dict["calculate_similarity_different_group"]:
+        two_group_matrix = calculate_similarity_between_groups(matrix, group_map)
+        if config_dict["visualize"]:
+            print(two_group_matrix)
+
+    if config_dict["calculate_precision_and_recall"]:
+        query_group = {key: value[100:] for key, value in group_map.items()}
+        result_list = (calculate_precision_and_recall(query_group, matrix, i) for i in np.arange(0.1, 1.0, 0.1))
+        for ele in result_list:
+            print(ele)
 
 if __name__ == '__main__':
-    test()
+    config_path = "/Users/zxj/PycharmProjects/cs535/task_parameters.ini"
+    do_experiment(config_path)
