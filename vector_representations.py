@@ -142,7 +142,8 @@ def verify_configs(config_dict):
 
 
 def build_vectorizer(vectorizer_type, use_stemmer):
-    tokenizer = create_tokenizer(CountVectorizer.build_tokenizer(), PorterStemmer()) if use_stemmer else None
+    a = CountVectorizer()
+    tokenizer = create_tokenizer(a.build_tokenizer(), PorterStemmer()) if use_stemmer else None
     if vectorizer_type == "count":
         return CountVectorizer(tokenizer=tokenizer, stop_words="english")
 
@@ -150,6 +151,21 @@ def build_vectorizer(vectorizer_type, use_stemmer):
         return TfidfVectorizer(tokenizer=tokenizer, stop_words="english")
 
     return None
+
+
+def graw_graph(recall, precision):
+    plt.step(recall, precision, color='b', alpha=0.2,
+             where='post')
+    plt.fill_between(recall, precision, step='post', alpha=0.2,
+                     color='b')
+
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.ylim([0.0, 1.05])
+    plt.xlim([0.0, 1.0])
+    plt.title('2-class Precision-Recall curve: AUC={0:0.2f}'.format(
+        np.mean(precision)))
+    plt.show()
 
 
 def do_experiment(config_path):
@@ -161,11 +177,13 @@ def do_experiment(config_path):
 
     if config_dict["read_matrix_from_file"]:
         matrix = np.load(config_dict["matrix_file_path"])
-        if config_dict["save_matrix"]:
-            np.save(config_dict["save_matrix_path"])
 
     else:
         matrix = vecotrizer.fit_transform(twenty_train.data)
+        if config_dict["save_matrix"]:
+            np.save(config_dict["save_matrix_path"])
+
+    print(matrix.shape)
 
     if config_dict["calculate_similarity_one_group"]:
         one_group_matrix = calculate_similarity_in_one_group(matrix, group_map)
@@ -179,9 +197,11 @@ def do_experiment(config_path):
 
     if config_dict["calculate_precision_and_recall"]:
         query_group = {key: value[100:] for key, value in group_map.items()}
-        result_list = (calculate_precision_and_recall(query_group, matrix, i) for i in np.arange(0.1, 1.0, 0.1))
-        for ele in result_list:
-            print(ele)
+        result_list = [calculate_precision_and_recall(query_group, matrix, i)
+                       for i in np.arange(0.1, 1.0, 0.1)]
+        precision = [ele[0] for ele in result_list]
+        recall = [ele[1] for ele in result_list]
+        graw_graph(recall, precision)
 
 if __name__ == '__main__':
     config_path = "/Users/zxj/PycharmProjects/cs535/task_parameters.ini"
