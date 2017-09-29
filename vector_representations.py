@@ -23,7 +23,7 @@ def group_data(twenty_train):
 
 
 def construct_matrix_and_group(vectorizer):
-    twenty_train = fetch_20newsgroups(subset="test", shuffle=True)
+    twenty_train = fetch_20newsgroups(subset="all", shuffle=True)
     group_matrix = vectorizer.fit_transform(twenty_train.data)
     groups = group_data(twenty_train)
     return group_matrix, groups
@@ -52,7 +52,8 @@ def calculate_similarity_between_groups(matrix, groups_map):
     similarity_matrix = np.ones((len(query_group.keys()), len(representative_group.keys())))
     for first in range(num_of_groups):
         for second in range(num_of_groups):
-            average_similarity = cosine_similarity(matrix[groups_map[first]], matrix[groups_map[second]]).mean()
+            average_similarity = cosine_similarity(matrix[representative_group[first]],
+                                                   matrix[query_group[second]]).mean()
             similarity_matrix[first][second] = average_similarity
     return similarity_matrix
 
@@ -88,15 +89,22 @@ def create_analyzer(old_analyzer, stemmer):
     return steamed_words
 
 
+def create_tokenizer(tokenizer, stemmer):
+    def tokenize(document):
+        tokens = tokenizer(document)
+        return [stemmer.stem(token) for token in tokens]
+    return tokenize
+
+
 def test():
     vectorizer_1 = CountVectorizer()
 
-    analyzer = vectorizer_1.build_analyzer()
+    tokenizer = vectorizer_1.build_tokenizer()
     stemmer = PorterStemmer()
-    vectorizer_1 = CountVectorizer(analyzer=create_analyzer(analyzer, stemmer))
-
-    matrix, groups_map = construct_matrix_and_group(vectorizer_1)
-
+    vectorizer_2 = CountVectorizer(tokenizer=create_tokenizer(tokenizer, stemmer))
+    matrix, groups_map = construct_matrix_and_group(vectorizer_2)
+    matrix_to_output = matrix.toarray()
+    np.save("./count_stem_matrix", matrix_to_output)
 
 if __name__ == '__main__':
     test()
