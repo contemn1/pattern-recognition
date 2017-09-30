@@ -107,6 +107,7 @@ def test():
     tokenizer = vectorizer_1.build_tokenizer()
     stemmer = PorterStemmer()
     matrix, groups_map = construct_matrix_and_group(vectorizer_1)
+    print(matrix.shape)
     _, query_group = divide_data_in_group(groups_map, 100)
     for x in np.arange(0.1, 1.0, 0.1):
         print(calculate_precision_and_recall(query_group, matrix, x))
@@ -142,13 +143,20 @@ def verify_configs(config_dict):
 
 
 def build_vectorizer(vectorizer_type, use_stemmer):
-    a = CountVectorizer()
-    tokenizer = create_tokenizer(a.build_tokenizer(), PorterStemmer()) if use_stemmer else None
+    origin = CountVectorizer() if vectorizer_type == "count" else TfidfVectorizer()
     if vectorizer_type == "count":
-        return CountVectorizer(tokenizer=tokenizer, stop_words="english")
+        if use_stemmer:
+            tokenizer = create_tokenizer(origin.build_tokenizer(), PorterStemmer())
+            return CountVectorizer(tokenizer=tokenizer)
+        else:
+            return CountVectorizer()
 
     if vectorizer_type == "tf-idf":
-        return TfidfVectorizer(tokenizer=tokenizer, stop_words="english")
+        if use_stemmer:
+            tokenizer = create_tokenizer(origin.build_tokenizer(), PorterStemmer())
+            return TfidfVectorizer(tokenizer=tokenizer)
+        else:
+            return TfidfVectorizer()
 
     return None
 
@@ -168,41 +176,79 @@ def graw_graph(recall, precision):
     plt.show()
 
 
+def print_max_and_min(matrix):
+    first = matrix.argmax()
+    second = matrix.argmin()
+    print("index of max in matrix is {0}".format(np.unravel_index(first, matrix.shape)))
+    print("index of min in matrix is {0}".format(np.unravel_index(second, matrix.shape)))
+
+
 def do_experiment(config_path):
     config_dict = read_configs(config_path)
     verify_configs(config_dict)
     vecotrizer = build_vectorizer(config_dict["vectorizer"], config_dict["use_porter_stemmer"])
-    twenty_train = fetch_20newsgroups(subset="all", shuffle=True)
-    group_map = group_data(twenty_train)
 
     if config_dict["read_matrix_from_file"]:
+        twenty_train = fetch_20newsgroups(subset="all", shuffle=True)
         matrix = np.load(config_dict["matrix_file_path"])
+        group_map = group_data(twenty_train)
 
     else:
-        matrix = vecotrizer.fit_transform(twenty_train.data)
+        matrix, group_map = construct_matrix_and_group(vecotrizer)
         if config_dict["save_matrix"]:
             np.save(config_dict["save_matrix_path"])
 
-    print(matrix.shape)
+    print("shape of matrix is {0}".format(matrix.shape))
+
+    sparseness = np.sum(matrix > 0, axis=1).mean()
+    print("sparseness of matrix is {0}".format(sparseness))
 
     if config_dict["calculate_similarity_one_group"]:
         one_group_matrix = calculate_similarity_in_one_group(matrix, group_map)
+
+        print_max_and_min(one_group_matrix)
         if config_dict["visualize"]:
-            print(one_group_matrix)
+            output_format = [["{0:.2f}".format(ele) for ele in row] for row in one_group_matrix]
+            output_format = [" ".join(row) for row in output_format]
+            for ele in output_format:
+                print(ele)
+
+            plt.matshow(one_group_matrix)
+            plt.show()
+
 
     if config_dict["calculate_similarity_different_group"]:
         two_group_matrix = calculate_similarity_between_groups(matrix, group_map)
+        print_max_and_min(two_group_matrix)
         if config_dict["visualize"]:
-            print(two_group_matrix)
+            output_format = [["{0:.2f}".format(ele) for ele in row] for row in two_group_matrix]
+            output_format = [" ".join(row) for row in output_format]
+            for ele in output_format:
+                print(ele)
+
+            plt.matshow(two_group_matrix)
+            plt.show()
+
 
     if config_dict["calculate_precision_and_recall"]:
-        query_group = {key: value[100:] for key, value in group_map.items()}
-        result_list = [calculate_precision_and_recall(query_group, matrix, i)
-                       for i in np.arange(0.1, 1.0, 0.1)]
-        precision = [ele[0] for ele in result_list]
-        recall = [ele[1] for ele in result_list]
-        graw_graph(recall, precision)
+        _, query_group = divide_data_in_group(group_map, 100)
+        precision_list = []
+        recall_list = []
+        for x in np.arange(0.0, 1.0, 0.1):
+            precision, recall = calculate_precision_and_recall(query_group, matrix, x)
+            precision_list.append(precision)
+            recall_list.append(recall)
+        graw_graph(recall_list, precision_list)
+
+
+def check_news_group_name():
+    twenty_train = fetch_20newsgroups(subset="all", shuffle=True)
+    print(twenty_train.target_names)
+    names_list = list(twenty_train.target_names)
+    print(names_list[5])
+    print(names_list[6])
+    print(names_list[15])
+
 
 if __name__ == '__main__':
-    config_path = "/Users/zxj/PycharmProjects/cs535/task_parameters.ini"
-    do_experiment(config_path)
+    check_news_group_name()
